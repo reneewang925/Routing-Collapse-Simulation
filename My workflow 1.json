@@ -1,0 +1,223 @@
+{
+  "name": "My workflow 1",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "caa29566-a0e6-4dee-9405-86e73950f98e",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "jsCode": "// 1. 定义 5 个压缩率\nconst rates = [1.0, 0.8, 0.5, 0.3, 0.1];\n\n// 2. 准备 FinQA (高风险) 数据（带真实背景）\nconst finqa_data = [\n  { \n    id: 1, \n    q: \"what is the net change in net revenue during 2015 for entergy corporation?\", \n    gt: \"94\", \n    ctx: \"Context: entergy corporation... Table Data: [['2014 net revenue', '$ 5735'], ['2015 net revenue', '$ 5829']]\" \n  },\n  { \n    id: 2, \n    q: \"what percentage of total facilities as measured in square feet are leased?\", \n    gt: \"14.5\", \n    ctx: \"Context: item 1b . unresolved staff comments... Table Data: [['owned facilities1', '30.7', '17.2', '47.9'], ['leased facilities2', '2.1', '6.0', '8.1'], ['total facilities', '32.8', '23.2', '56.0']]\" \n  },\n  { \n    id: 3, \n    q: \"what is the percentage change in cash flow hedges in 2011 compare to the 2010?\", \n    gt: \"3\", \n    ctx: \"Context: undesignated hedges was $ 41.2 million ... Table Data: [['other income', '$ -4614', '$ 4614', '$ 2014']]\" \n  },\n  { \n    id: 4, \n    q: \"what portion of total purchase price is related to stock awards?\", \n    gt: \"2.9\", \n    ctx: \"Context: metavante on october 1 , 2009 ... Table Data: [['value of metavante common stock', '$ 4066.4'], ['value of metavante stock awards', '121.4'], ['total purchase price', '$ 4187.8']]\" \n  },\n  { \n    id: 5, \n    q: \"what was the difference in percentage cumulative total shareholder return on masco common stock versus the s&p 500 index for the five year period ended 2017?\", \n    gt: \"54.4\", \n    ctx: \"Context: performance graph the table below compares ... Table Data: [['', '2013', '2017'], ['masco', '$ 138.48', '$ 318.46'], ['s&p 500 index', '$ 132.04', '$ 206.49']]\" \n  }\n];\n\n// 3. 准备 FAQ (低风险) 数据（带真实背景）\nconst faq_data = [\n  { \n    id: 1, \n    q: \"How do I request a refund for my order?\", \n    gt: \"30 days\", \n    ctx: \"Refund Policy: We want you to be completely satisfied with your purchase. If you are not satisfied, you may request a refund within 30 days of the original purchase date. To request a refund, please go to the 'My Orders' section...\" \n  },\n  { \n    id: 2, \n    q: \"My package hasn't arrived yet, can you track it?\", \n    gt: \"tracking number\", \n    ctx: \"Shipping and Delivery: ... Once your order has shipped, you will receive a tracking number via email. You can use this tracking number to monitor the status of your package...\" \n  },\n  { \n    id: 3, \n    q: \"I forgot my password, how do I reset it?\", \n    gt: \"Forgot Password\", \n    ctx: \"Account and Password: If you have forgotten your password, click on the 'Forgot Password' link on the login page. Enter the email address associated with your account...\" \n  },\n  { \n    id: 4, \n    q: \"Can I change the shipping address after placing the order?\", \n    gt: \"contact support\", \n    ctx: \"Shipping and Delivery: ... If your package has not arrived within the estimated delivery time, please check with your local post office or contact our support team.\" \n  },\n  { \n    id: 5, \n    q: \"What is your return policy for electronics?\", \n    gt: \"original packaging\", \n    ctx: \"Refund Policy: ... Please note that items must be in their original packaging and unused. Once we receive your return, it may take 5-7 business days...\" \n  }\n];\n\nconst results = [];\n\n// 4. 核心逻辑：双层循环生成所有组合，并完美拼接 Context 和 Question\nfor (const rate of rates) {\n  \n  // 组装 FinQA\n  for (let i = 0; i < finqa_data.length; i++) {\n    results.push({\n      Dataset: \"FinQA_HighRisk\",\n      Query_ID: finqa_data[i].id,\n      // 核心：把背景和问题拼在一起！\n      Question: finqa_data[i].ctx + \"\\n\\nQuestion: \" + finqa_data[i].q,\n      Ground_Truth: finqa_data[i].gt,\n      Rate: rate\n    });\n  }\n\n  // 组装 FAQ\n  for (let i = 0; i < faq_data.length; i++) {\n    results.push({\n      Dataset: \"FAQ_LowRisk\",\n      Query_ID: faq_data[i].id,\n      // 核心：把背景和问题拼在一起！\n      Question: faq_data[i].ctx + \"\\n\\nQuestion: \" + faq_data[i].q,\n      Ground_Truth: faq_data[i].gt,\n      Rate: rate\n    });\n  }\n}\n\nreturn results;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        288,
+        0
+      ],
+      "id": "778565f1-8a3e-433a-9b02-4b28a6ab0fa7",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://127.0.0.1:11434/api/generate",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "model",
+              "value": "qwen2.5:1.5b"
+            },
+            {
+              "name": "prompt",
+              "value": "=Based on the context: {{ $json.compressed_text }} \n\nAnswer the question: {{ $('Code in JavaScript').item.json.Query_Text }}"
+            },
+            {
+              "name": "stream",
+              "value": "={{ false }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        1024,
+        16
+      ],
+      "id": "6c9b2a67-080a-4647-8414-306d6d15f38a",
+      "name": "Small Model (Qwen)"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://127.0.0.1:8000/compress",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "text",
+              "value": "={{ $json.Question }}"
+            },
+            {
+              "name": "rate",
+              "value": "={{ $json.Rate }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        800,
+        16
+      ],
+      "id": "c648015e-0266-406e-af3a-fa0c1b233221",
+      "name": "LLMLingua"
+    },
+    {
+      "parameters": {
+        "options": {
+          "headerRow": true
+        }
+      },
+      "type": "n8n-nodes-base.convertToFile",
+      "typeVersion": 1.1,
+      "position": [
+        800,
+        -176
+      ],
+      "id": "ff69e9a3-34a5-46ba-867a-3a05a393c517",
+      "name": "Convert to File"
+    },
+    {
+      "parameters": {
+        "jsCode": "function isAnswerCorrect(response, groundTruth) {\n  if (response === undefined || response === null || groundTruth === undefined || groundTruth === null) {\n    return false;\n  }\n\n  const rawResp = String(response);\n  const rawGT = String(groundTruth);\n\n  const normalize = (s) =>\n    String(s)\n      .toLowerCase()\n      .replace(/^\\s*\\d+[\\.\\)]\\s+/gm, '')\n      .replace(/[^\\p{L}\\p{N}\\s.\\-]/gu, ' ')\n      .replace(/\\s+/g, ' ')\n      .trim();\n\n  const cleanResp = normalize(rawResp);\n  const cleanGT = normalize(rawGT);\n\n  const gtPercentMatch = rawGT.trim().match(/^(-?\\d+(?:\\.\\d+)?)\\s*%$/);\n  let gtNumber = null;\n\n  if (gtPercentMatch) {\n    gtNumber = parseFloat(gtPercentMatch[1]) / 100;\n  } else if (/^-?\\d+(\\.\\d+)?$/.test(cleanGT)) {\n    gtNumber = parseFloat(cleanGT);\n  }\n\n  if (gtNumber !== null) {\n    const respNumbers = cleanResp.match(/-?\\d+(\\.\\d+)?/g) || [];\n    for (const numStr of respNumbers) {\n      const num = parseFloat(numStr);\n      if (Math.abs(num - gtNumber) < 0.001) return true;\n      if (Math.abs(num / 100 - gtNumber) < 0.001) return true;\n      if (Math.abs(num * 100 - gtNumber) < 0.001) return true;\n    }\n    return false;\n  }\n\n  if (!cleanGT) return false;\n  return cleanResp.includes(cleanGT);\n}\n\n// ==========================================\n// 主体执行逻辑\n// ==========================================\nconst response = $json.response || \"\";\nconst originalData = $('Loop Over Items').item.json;\nconst groundTruth = String(originalData.Ground_Truth || \"\");\n\nlet finalResponse = response;\nlet finalModel = $json.model;\nlet fallbackTriggered = \"No\";\nlet finalIsCorrect = isAnswerCorrect(response, groundTruth);\n\n// 🌟 新增：记录小模型（Qwen）的初始 Token 消耗\nlet cheapPromptTokens = Number($json.prompt_eval_count || 0);\nlet cheapOutputTokens = Number($json.eval_count || 0);\n\n// 🌟 新增：记录大模型（Llama3）的 Token 消耗，默认为 0\nlet fallbackPromptTokens = 0;\nlet fallbackOutputTokens = 0;\n\n// 当前模型耗时，Ollama 的 total_duration 通常是纳秒\nlet latency_seconds = Number($json.total_duration || 0) / 1e9;\n\nif (!finalIsCorrect) {\n  fallbackTriggered = \"Yes\";\n  finalModel = \"llama3:8b\";\n\n  try {\n    const httpRequest = await this.helpers.httpRequest({\n      method: 'POST',\n      url: 'http://127.0.0.1:11434/api/generate',\n      body: {\n        model: \"llama3:8b\",\n        prompt: \"Based on the context: \" + originalData.Question + \" \\n\\n Answer: \",\n        stream: false\n      },\n      json: true\n    });\n\n    finalResponse = httpRequest.response || \"Fallback Error\";\n    finalIsCorrect = isAnswerCorrect(finalResponse, groundTruth);\n\n    // 🌟 新增：记录 fallback 大模型的 Token\n    fallbackPromptTokens = Number(httpRequest.prompt_eval_count || 0);\n    fallbackOutputTokens = Number(httpRequest.eval_count || 0);\n\n    // 加上 fallback 模型耗时\n    latency_seconds += Number(httpRequest.total_duration || 0) / 1e9;\n  } catch (error) {\n    finalResponse = \"Fallback Failed: \" + error.message;\n  }\n}\n\n// ==========================================\n// 导出数据\n// ==========================================\nreturn {\n  Dataset: originalData.Dataset,\n  Query_ID: originalData.Query_ID,\n  Rate: originalData.Rate,\n  Is_Correct: finalIsCorrect,\n  Question: String(originalData.Question || \"\").replace(/[\\r\\n]+/g, \" \"),\n  Ground_Truth: groundTruth.replace(/[\\r\\n]+/g, \" \"),\n  Model_Response: String(finalResponse || \"\").replace(/[\\r\\n]+/g, \" \"),\n  Model_Used: finalModel,\n  Fallback_Triggered: fallbackTriggered,\n  \n  // 🌟 把新旧 Token 字段全部输出，方便 Python 精准算账\n  Cheap_Prompt_Tokens: cheapPromptTokens,\n  Cheap_Output_Tokens: cheapOutputTokens,\n  Fallback_Prompt_Tokens: fallbackPromptTokens,\n  Fallback_Output_Tokens: fallbackOutputTokens,\n  \n  // 保留原来的总计字段以兼容旧图表\n  Prompt_Tokens: cheapPromptTokens + fallbackPromptTokens,\n  Output_Tokens: cheapOutputTokens + fallbackOutputTokens,\n  Total_Tokens: cheapPromptTokens + cheapOutputTokens + fallbackPromptTokens + fallbackOutputTokens,\n  \n  Latency_Seconds: latency_seconds\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1248,
+        16
+      ],
+      "id": "4ccd9511-239d-4a75-87d8-c65e0b0ce0a7",
+      "name": "Evaluate Answer"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        576,
+        0
+      ],
+      "id": "b83fef1a-d751-4f47-940a-f347fb4d6b43",
+      "name": "Loop Over Items"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LLMLingua": {
+      "main": [
+        [
+          {
+            "node": "Small Model (Qwen)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Small Model (Qwen)": {
+      "main": [
+        [
+          {
+            "node": "Evaluate Answer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Evaluate Answer": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items": {
+      "main": [
+        [
+          {
+            "node": "Convert to File",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "LLMLingua",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Convert to File": {
+      "main": [
+        []
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "625dcfbd-23b0-4d7a-bdf8-082fee9028d3",
+  "meta": {
+    "instanceId": "619118e572022c34f649a026cfb59f3af0016f3659fe89c0b4220465d5943311"
+  },
+  "nodeGroups": [],
+  "id": "ZuihnKkNnR2Jqluv",
+  "tags": []
+}
