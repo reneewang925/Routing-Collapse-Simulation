@@ -1,24 +1,41 @@
-# Mitigating Routing Collapse: Joint Optimization of Context Compression and Test-time Routing
+# Joint Optimization of Context Compression and Test-Time Routing under Information Starvation
 
-This repository contains the code, n8n workflow, and dataset for the simulation of the "Routing Collapse" experiment. 
+**Author:** Rui Wang  
+**Supervisor:** Venketsh Viswanathan  
+**Institution:** Stockholm University (DSV), SHAIO
 
-The project investigates the economic inflection point between context compression and test-time routing, incorporating a **Latency-aware Total Cost of Ownership (TCO)** model.
+## 📌 Overview
+Agentic systems often face a compounding "Context Tax". While front-end context compression (e.g., LLMLingua) can reduce token costs, blind or extreme compression causes **Information Starvation**. This triggers **Routing Collapse**—a scenario where the system frequently falls back to expensive, large models (Llama3: 8B) but still fails to answer correctly.
 
-## 📂 Repository Structure
-* `My workflow 1.json`: The complete n8n workflow architecture (includes LLMLingua, Qwen 1.5B, and Llama3 8B fallback logic).
-* `llmlingua_api.py`: The FastAPI wrapper for the local LLMLingua compression service.
-* `prepare_n8n_data.py` / `make_json.py`: Scripts used to generate and format the 50 test queries (FinQA and FAQ).
-* `File (10).csv`: The final experimental results. *(Note: Includes granular token tracking for cheap/expensive models and precise latency metrics)*.
-* `plot_results.py`: Python script to generate the Latency-aware TCO curve, Pareto Frontier, and Cost Breakdown charts.
-* `Figure_1_TCO_with_latency.png` & `Figure_2_Pareto_latency.png`: The final plotted figures used in the poster.
+This repository contains the experimental pipeline, raw data, and visualization scripts to evaluate the **Total Cost of Ownership (TCO)** under varying compression rates (\(r\)) and task risk levels (Low-Risk FAQ vs. High-Risk FinQA).
 
-## 🚀 How to Reproduce
-1. Start the LLMLingua API: `uvicorn llmlingua_api:app --host 127.0.0.1 --port 8000`
-2. Import `My workflow 1.json` into n8n.
-3. Execute the n8n workflow to generate the raw CSV results.
-4. Run `python plot_results.py` to generate the final figures.
+## 🔬 Key Findings
+*   **FAQ (Low-Risk): Perfect Pareto Optimality.** Achieves 100% accuracy with a very low TCO (< 800 units) at \(r=1.0\) and \(r=0.8\). Over-compression (\(r<0.5\)) forces unnecessary fallbacks, increasing costs without any accuracy gains.
+*   **FinQA (High-Risk): Severe Routing Collapse.** Information starvation triggers fallback rates to jump from 60% (\(r=1.0\)) to 80% (\(r=0.8\)). This causes a sharp TCO spike to **~3300** due to redundant compute and latency penalties. The absolute peak TCO (**~3600**) occurs at \(r=0.3\) where 100% fallback is forced.
+*   **The "False Economy" of Extreme Compression:** At \(r=0.1\), although TCO slightly dips because the expensive model "gives up" and outputs extremely short rejection responses ("Not mentioned"), the task accuracy is permanently destroyed (drops to 40%). The entire frontend compression effort becomes pure **Sunk Cost**.
 
-## 📊 Key Findings
-* **Routing Collapse in High-Risk Tasks:** For FinQA, extreme compression triggers Information Starvation, forcing frequent fallbacks to expensive models. The total TCO remains prohibitively high (>5000 units) due to double-paying for compute and latency.
-* **Optimal Compression for Low-Risk Tasks:** FAQ tasks achieve a Pareto improvement at \(r=0.3\), balancing accuracy and cost.
-* **The Latency Penalty:** Waiting time is modeled as an opportunity cost (\(P_{latency}\)), proving that unnecessary fallback routes destroy ROI in enterprise agentic workflows.
+## ⚙️ Methodology
+The Expected TCO is defined as a function of the compression rate \(r\):
+
+$$
+\mathbb{E}[TCO(r)] = \text{Compute OpEx} + \text{Latency Opportunity Cost}
+$$
+
+*   **Compute OpEx:** Includes the compression cost, the cheap model (Qwen2.5:1.5B) token costs, and the fallback large model (Llama3:8B) token costs.
+*   **Latency Cost:** A penalty factor (1 second = 200 relative units) reflecting the opportunity cost of system waiting time.
+
+### Experimental Pipeline
+`Raw Data (FinQA / FAQ)` → `LLMLingua (Rate r)` → `Qwen2.5:1.5B (Cheap Inference)` → `Evaluator` → `Fallback to Llama3:8B (if triggered)`
+
+## 📂 Code & Reproduction
+
+```text
+# Repository Structure
+├── File.csv                         # Raw experimental data (50 queries, 5 compression rates)
+├── plot_results.py                  # Python script to calculate TCO and generate all figures
+├── Figure_1_TCO_with_latency.png    # Latency-aware TCO vs. Compression Rate
+├── Figure_2_Pareto_Frontier.png     # Pareto Frontier (Task Accuracy vs. TCO)
+├── Figure_3_Cost_Breakdown.png      # Stacked bar chart of Compute vs. Latency Costs
+└── README.md                        # Project documentation
+
+
